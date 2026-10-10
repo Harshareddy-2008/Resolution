@@ -1,0 +1,6 @@
+{
+  "name": "RESOLUTION — AI Employment, Skill & Retention Platform",
+  "description": "AI-powered employment, skill development, candidate placement, and 90/180/365-day employee retention management platform connecting students, graduates, professionals, companies, and coaching centers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

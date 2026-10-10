@@ -1,0 +1,807 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'wasimakram99941@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidStringArray(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 120));
+    }
+
+    // 1. UserPublicProfile (/users/{userId})
+    function isValidUserPublicProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'careerStatus', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'uid', 'displayName', 'role', 'careerStatus', 'highestQualification',
+          'collegeName', 'graduationYear', 'fieldOfStudy', 'city', 'state', 'country',
+          'skills', 'targetRoles', 'resumeSummary', 'readinessScore', 'yearsOfExperience',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.role is string && data.role in ['user', 'company', 'coaching', 'admin'] &&
+        data.careerStatus is string && data.careerStatus in ['undergraduate', 'graduated_unemployed', 'graduated_employed', 'postgraduate', 'other'] &&
+        (!('highestQualification' in data) || (data.highestQualification is string && data.highestQualification.size() <= 120)) &&
+        (!('collegeName' in data) || (data.collegeName is string && data.collegeName.size() <= 200)) &&
+        (!('graduationYear' in data) || (data.graduationYear is string && data.graduationYear.size() <= 10)) &&
+        (!('fieldOfStudy' in data) || (data.fieldOfStudy is string && data.fieldOfStudy.size() <= 120)) &&
+        (!('city' in data) || (data.city is string && data.city.size() <= 100)) &&
+        (!('state' in data) || (data.state is string && data.state.size() <= 100)) &&
+        (!('country' in data) || (data.country is string && data.country.size() <= 100)) &&
+        (!('skills' in data) || isValidStringArray(data.skills, 50)) &&
+        (!('targetRoles' in data) || isValidStringArray(data.targetRoles, 20)) &&
+        (!('resumeSummary' in data) || (data.resumeSummary is string && data.resumeSummary.size() <= 2000)) &&
+        (!('readinessScore' in data) || (data.readinessScore is number && data.readinessScore >= 0 && data.readinessScore <= 100)) &&
+        (!('yearsOfExperience' in data) || (data.yearsOfExperience is number && data.yearsOfExperience >= 0 && data.yearsOfExperience <= 60)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (existing().uid == request.auth.uid || existing().role in ['user', 'company', 'coaching'] || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || existing().role in ['user', 'company', 'coaching'] || isAdmin());
+      allow create: if isSignedIn() && isValidId(userId) && isValidUserPublicProfile(incoming()) &&
+        (
+          (incoming().uid == userId && incoming().uid == request.auth.uid && incoming().role != 'admin') ||
+          isAdmin()
+        ) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(userId) && isValidUserPublicProfile(incoming()) && (
+        isAdmin() || (
+          existing().uid == request.auth.uid &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (incoming().role == existing().role || incoming().role in ['user', 'company', 'coaching']) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'displayName', 'role', 'careerStatus', 'highestQualification',
+            'collegeName', 'graduationYear', 'fieldOfStudy', 'city', 'state', 'country',
+            'skills', 'targetRoles', 'resumeSummary', 'readinessScore', 'yearsOfExperience',
+            'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(userId);
+
+      // 2. UserPrivateRecord (/users/{userId}/private/{docId})
+      function isValidUserPrivateRecord(data) {
+        return data.keys().hasAll(['userId', 'email', 'privacyConsent', 'emailNotificationsConsent', 'updatedAt']) &&
+          data.keys().hasOnly([
+            'userId', 'email', 'mobileNumber', 'dateOfBirth', 'gender', 'postalCode',
+            'currentCompany', 'designation', 'industry', 'workLocation', 'joiningDate',
+            'currentSalary', 'expectedSalary', 'employeeIdVerification',
+            'privacyConsent', 'emailNotificationsConsent', 'resumeFileName', 'resumeAnalysisJson',
+            'updatedAt'
+          ]) &&
+          data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 && data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+          data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+          (!('mobileNumber' in data) || (data.mobileNumber is string && data.mobileNumber.size() <= 30)) &&
+          (!('dateOfBirth' in data) || (data.dateOfBirth is string && data.dateOfBirth.size() <= 20)) &&
+          (!('gender' in data) || (data.gender is string && data.gender.size() <= 40)) &&
+          (!('postalCode' in data) || (data.postalCode is string && data.postalCode.size() <= 20)) &&
+          (!('currentCompany' in data) || (data.currentCompany is string && data.currentCompany.size() <= 160)) &&
+          (!('designation' in data) || (data.designation is string && data.designation.size() <= 160)) &&
+          (!('industry' in data) || (data.industry is string && data.industry.size() <= 120)) &&
+          (!('workLocation' in data) || (data.workLocation is string && data.workLocation.size() <= 160)) &&
+          (!('joiningDate' in data) || (data.joiningDate is string && data.joiningDate.size() <= 30)) &&
+          (!('currentSalary' in data) || (data.currentSalary is number && data.currentSalary >= 0)) &&
+          (!('expectedSalary' in data) || (data.expectedSalary is number && data.expectedSalary >= 0)) &&
+          (!('employeeIdVerification' in data) || (data.employeeIdVerification is string && data.employeeIdVerification.size() <= 80)) &&
+          data.privacyConsent is bool &&
+          data.emailNotificationsConsent is bool &&
+          (!('resumeFileName' in data) || (data.resumeFileName is string && data.resumeFileName.size() <= 255)) &&
+          (!('resumeAnalysisJson' in data) || (data.resumeAnalysisJson is string && data.resumeAnalysisJson.size() <= 20000)) &&
+          data.updatedAt is timestamp;
+      }
+
+      match /private/{docId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(docId) && (
+          (request.auth.uid == userId && exists(/databases/$(database)/documents/users/$(userId))) ||
+          isAdmin()
+        );
+        allow list: if isSignedIn() && isValidId(userId) && (existing().userId == request.auth.uid || isAdmin());
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(docId) &&
+          isValidUserPrivateRecord(incoming()) &&
+          (
+            (request.auth.uid == userId && incoming().userId == userId) ||
+            isAdmin()
+          ) &&
+          incoming().updatedAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isSignedIn() && isValidId(userId) && isValidId(docId) &&
+          isValidUserPrivateRecord(incoming()) && (
+            isAdmin() || (
+              request.auth.uid == userId &&
+              existing().userId == request.auth.uid &&
+              incoming().userId == existing().userId &&
+              incoming().updatedAt == request.time &&
+              exists(/databases/$(database)/documents/users/$(userId)) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'email', 'mobileNumber', 'dateOfBirth', 'gender', 'postalCode',
+                'currentCompany', 'designation', 'industry', 'workLocation', 'joiningDate',
+                'currentSalary', 'expectedSalary', 'employeeIdVerification',
+                'privacyConsent', 'emailNotificationsConsent', 'resumeFileName', 'resumeAnalysisJson',
+                'updatedAt'
+              ])
+            )
+          );
+        allow delete: if isSignedIn() && isValidId(userId) && isValidId(docId) && (request.auth.uid == userId || isAdmin());
+      }
+    }
+
+    // 3. Company (/companies/{companyId})
+    function isValidCompany(data) {
+      return data.keys().hasAll([
+          'ownerId', 'companyName', 'officialEmail', 'contactPerson', 'industry',
+          'country', 'city', 'verificationStatus', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'companyName', 'officialEmail', 'contactPerson', 'contactNumber',
+          'website', 'description', 'industry', 'companySize', 'yearEstablished',
+          'headquarters', 'country', 'state', 'city', 'officeAddress',
+          'verificationStatus', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+        data.officialEmail is string && data.officialEmail.size() >= 3 && data.officialEmail.size() <= 254 &&
+        data.contactPerson is string && data.contactPerson.size() >= 1 && data.contactPerson.size() <= 120 &&
+        (!('contactNumber' in data) || (data.contactNumber is string && data.contactNumber.size() <= 30)) &&
+        (!('website' in data) || (data.website is string && data.website.size() <= 300)) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+        data.industry is string && data.industry.size() >= 1 && data.industry.size() <= 120 &&
+        (!('companySize' in data) || (data.companySize is string && data.companySize.size() <= 60)) &&
+        (!('yearEstablished' in data) || (data.yearEstablished is string && data.yearEstablished.size() <= 10)) &&
+        (!('headquarters' in data) || (data.headquarters is string && data.headquarters.size() <= 160)) &&
+        data.country is string && data.country.size() >= 1 && data.country.size() <= 100 &&
+        (!('state' in data) || (data.state is string && data.state.size() <= 100)) &&
+        data.city is string && data.city.size() >= 1 && data.city.size() <= 100 &&
+        (!('officeAddress' in data) || (data.officeAddress is string && data.officeAddress.size() <= 400)) &&
+        data.verificationStatus is string && data.verificationStatus in ['pending', 'verified', 'rejected'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /companies/{companyId} {
+      allow get: if isValidId(companyId) && (existing().verificationStatus in ['verified', 'pending'] || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin())));
+      allow list: if existing().verificationStatus in ['verified', 'pending'] || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin()));
+      allow create: if isSignedIn() && isValidId(companyId) && isValidCompany(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        (incoming().verificationStatus == 'pending' || isAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(companyId) && isValidCompany(incoming()) && (
+        isAdmin() || (
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().verificationStatus == existing().verificationStatus &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'companyName', 'officialEmail', 'contactPerson', 'contactNumber',
+            'website', 'description', 'industry', 'companySize', 'yearEstablished',
+            'headquarters', 'country', 'state', 'city', 'officeAddress', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(companyId);
+    }
+
+    // 4. JobListing (/jobs/{jobId})
+    function isValidJobListing(data) {
+      return data.keys().hasAll([
+          'companyId', 'ownerId', 'companyName', 'title', 'industry', 'description',
+          'requiredSkills', 'employmentType', 'workMode', 'location',
+          'salaryMin', 'salaryMax', 'currency', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'companyId', 'ownerId', 'companyName', 'title', 'department', 'industry',
+          'description', 'requiredSkills', 'preferredSkills', 'educationalQualifications',
+          'requiredExperience', 'vacancies', 'employmentType', 'workMode', 'location',
+          'country', 'salaryMin', 'salaryMax', 'currency', 'benefits', 'deadline',
+          'interviewProcess', 'requiredCertifications', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.companyId is string && data.companyId.size() >= 1 && data.companyId.size() <= 128 && data.companyId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        (!('department' in data) || (data.department is string && data.department.size() <= 120)) &&
+        data.industry is string && data.industry.size() >= 1 && data.industry.size() <= 120 &&
+        data.description is string && data.description.size() >= 1 && data.description.size() <= 4000 &&
+        isValidStringArray(data.requiredSkills, 30) &&
+        (!('preferredSkills' in data) || isValidStringArray(data.preferredSkills, 30)) &&
+        (!('educationalQualifications' in data) || (data.educationalQualifications is string && data.educationalQualifications.size() <= 240)) &&
+        (!('requiredExperience' in data) || (data.requiredExperience is string && data.requiredExperience.size() <= 80)) &&
+        (!('vacancies' in data) || (data.vacancies is number && data.vacancies >= 1 && data.vacancies <= 10000)) &&
+        data.employmentType is string && data.employmentType in ['Full-time', 'Internship', 'Contract', 'Part-time'] &&
+        data.workMode is string && data.workMode in ['On-site', 'Hybrid', 'Remote'] &&
+        data.location is string && data.location.size() >= 1 && data.location.size() <= 160 &&
+        (!('country' in data) || (data.country is string && data.country.size() <= 100)) &&
+        data.salaryMin is number && data.salaryMin >= 0 &&
+        data.salaryMax is number && data.salaryMax >= data.salaryMin &&
+        data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+        (!('benefits' in data) || (data.benefits is string && data.benefits.size() <= 1000)) &&
+        (!('deadline' in data) || (data.deadline is string && data.deadline.size() <= 40)) &&
+        (!('interviewProcess' in data) || (data.interviewProcess is string && data.interviewProcess.size() <= 1000)) &&
+        (!('requiredCertifications' in data) || (data.requiredCertifications is string && data.requiredCertifications.size() <= 400)) &&
+        data.status is string && data.status in ['active', 'paused', 'closed'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /jobs/{jobId} {
+      allow get: if isValidId(jobId) && (existing().status == 'active' || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin())));
+      allow list: if existing().status == 'active' || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin()));
+      allow create: if isSignedIn() && isValidId(jobId) && isValidJobListing(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/companies/$(incoming().companyId));
+      allow update: if isSignedIn() && isValidId(jobId) && isValidJobListing(incoming()) && (
+        isAdmin() || (
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().companyId == existing().companyId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'department', 'industry', 'description', 'requiredSkills',
+            'preferredSkills', 'educationalQualifications', 'requiredExperience',
+            'vacancies', 'employmentType', 'workMode', 'location', 'country',
+            'salaryMin', 'salaryMax', 'currency', 'benefits', 'deadline',
+            'interviewProcess', 'requiredCertifications', 'status', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(jobId);
+    }
+
+    // 5. JobApplication (/applications/{applicationId})
+    function isValidJobApplication(data) {
+      return data.keys().hasAll([
+          'jobId', 'jobTitle', 'companyId', 'companyOwnerId', 'companyName',
+          'candidateId', 'candidateName', 'candidateSkills', 'matchScore',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'jobId', 'jobTitle', 'companyId', 'companyOwnerId', 'companyName',
+          'candidateId', 'candidateName', 'candidateEmail', 'candidateQualification',
+          'candidateSkills', 'matchScore', 'matchExplanation', 'status',
+          'interviewDate', 'offeredSalary', 'createdAt', 'updatedAt'
+        ]) &&
+        data.jobId is string && data.jobId.size() >= 1 && data.jobId.size() <= 128 && data.jobId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.jobTitle is string && data.jobTitle.size() >= 1 && data.jobTitle.size() <= 160 &&
+        data.companyId is string && data.companyId.size() >= 1 && data.companyId.size() <= 128 && data.companyId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyOwnerId is string && data.companyOwnerId.size() >= 1 && data.companyOwnerId.size() <= 128 && data.companyOwnerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+        data.candidateId is string && data.candidateId.size() >= 1 && data.candidateId.size() <= 128 && data.candidateId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.candidateName is string && data.candidateName.size() >= 1 && data.candidateName.size() <= 120 &&
+        (!('candidateEmail' in data) || (data.candidateEmail is string && data.candidateEmail.size() <= 254)) &&
+        (!('candidateQualification' in data) || (data.candidateQualification is string && data.candidateQualification.size() <= 160)) &&
+        isValidStringArray(data.candidateSkills, 50) &&
+        data.matchScore is number && data.matchScore >= 0 && data.matchScore <= 100 &&
+        (!('matchExplanation' in data) || (data.matchExplanation is string && data.matchExplanation.size() <= 1000)) &&
+        data.status is string && data.status in ['Applied', 'Under Review', 'Shortlisted', 'Interview', 'Offered', 'Hired', 'Rejected'] &&
+        (!('interviewDate' in data) || (data.interviewDate is string && data.interviewDate.size() <= 60)) &&
+        (!('offeredSalary' in data) || (data.offeredSalary is number && data.offeredSalary >= 0)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /applications/{applicationId} {
+      allow get: if isSignedIn() && isValidId(applicationId) && (
+        existing().candidateId == request.auth.uid ||
+        existing().companyOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().candidateId == request.auth.uid ||
+        existing().companyOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidId(applicationId) && isValidJobApplication(incoming()) &&
+        (
+          (incoming().candidateId == request.auth.uid && incoming().status == 'Applied') ||
+          isAdmin()
+        ) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/jobs/$(incoming().jobId));
+      allow update: if isSignedIn() && isValidId(applicationId) && isValidJobApplication(incoming()) && (
+        isAdmin() || (
+          existing().companyOwnerId == request.auth.uid &&
+          existing().status != 'Hired' &&
+          incoming().candidateId == existing().candidateId &&
+          incoming().jobId == existing().jobId &&
+          incoming().companyId == existing().companyId &&
+          incoming().companyOwnerId == existing().companyOwnerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'interviewDate', 'offeredSalary', 'updatedAt'])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(applicationId);
+    }
+
+    // 6. PlacementRecord (/placements/{placementId})
+    function isValidPlacementRecord(data) {
+      return data.keys().hasAll([
+          'candidateId', 'candidateName', 'jobId', 'companyId', 'companyOwnerId',
+          'companyName', 'designation', 'joiningDate', 'workLocation',
+          'offeredSalary', 'currency', 'employmentType', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'candidateId', 'candidateName', 'candidateEmail', 'jobId', 'jobTitle',
+          'companyId', 'companyOwnerId', 'companyName', 'designation', 'joiningDate',
+          'workLocation', 'offeredSalary', 'currency', 'employmentType', 'status',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.candidateId is string && data.candidateId.size() >= 1 && data.candidateId.size() <= 128 && data.candidateId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.candidateName is string && data.candidateName.size() >= 1 && data.candidateName.size() <= 120 &&
+        (!('candidateEmail' in data) || (data.candidateEmail is string && data.candidateEmail.size() <= 254)) &&
+        data.jobId is string && data.jobId.size() >= 1 && data.jobId.size() <= 128 && data.jobId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        (!('jobTitle' in data) || (data.jobTitle is string && data.jobTitle.size() <= 160)) &&
+        data.companyId is string && data.companyId.size() >= 1 && data.companyId.size() <= 128 && data.companyId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyOwnerId is string && data.companyOwnerId.size() >= 1 && data.companyOwnerId.size() <= 128 && data.companyOwnerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+        data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 160 &&
+        data.joiningDate is string && data.joiningDate.size() >= 1 && data.joiningDate.size() <= 40 &&
+        data.workLocation is string && data.workLocation.size() >= 1 && data.workLocation.size() <= 160 &&
+        data.offeredSalary is number && data.offeredSalary >= 0 &&
+        data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+        data.employmentType is string && data.employmentType.size() >= 1 && data.employmentType.size() <= 40 &&
+        data.status is string && data.status in ['confirmed', 'completed'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /placements/{placementId} {
+      allow get: if isSignedIn() && isValidId(placementId) && (
+        existing().candidateId == request.auth.uid ||
+        existing().companyOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().candidateId == request.auth.uid ||
+        existing().companyOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidId(placementId) && isValidPlacementRecord(incoming()) &&
+        (incoming().companyOwnerId == request.auth.uid || isAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/jobs/$(incoming().jobId));
+      allow update: if isSignedIn() && isValidId(placementId) && isValidPlacementRecord(incoming()) && (
+        isAdmin() || (
+          existing().companyOwnerId == request.auth.uid &&
+          existing().status != 'completed' &&
+          incoming().candidateId == existing().candidateId &&
+          incoming().companyOwnerId == existing().companyOwnerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(placementId);
+    }
+
+    // 7. RetentionCheckIn (/retentionCheckIns/{checkInId})
+    function isValidRetentionCheckIn(data) {
+      return data.keys().hasAll([
+          'placementId', 'candidateId', 'candidateName', 'companyId', 'companyOwnerId',
+          'companyName', 'designation', 'joiningDate', 'checkpointDays', 'dueDate',
+          'emailStatus', 'employmentStatus', 'remainsWithOriginalCompany',
+          'verificationStatus', 'status', 'assistanceRequested', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'placementId', 'candidateId', 'candidateName', 'candidateEmail',
+          'companyId', 'companyOwnerId', 'companyName', 'designation', 'joiningDate',
+          'checkpointDays', 'dueDate', 'emailStatus', 'responseDate', 'employmentStatus',
+          'remainsWithOriginalCompany', 'currentEmployer', 'reportedSalary',
+          'verificationStatus', 'status', 'assistanceRequested', 'createdAt', 'updatedAt'
+        ]) &&
+        data.placementId is string && data.placementId.size() >= 1 && data.placementId.size() <= 128 && data.placementId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.candidateId is string && data.candidateId.size() >= 1 && data.candidateId.size() <= 128 && data.candidateId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.candidateName is string && data.candidateName.size() >= 1 && data.candidateName.size() <= 120 &&
+        (!('candidateEmail' in data) || (data.candidateEmail is string && data.candidateEmail.size() <= 254)) &&
+        data.companyId is string && data.companyId.size() >= 1 && data.companyId.size() <= 128 && data.companyId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyOwnerId is string && data.companyOwnerId.size() >= 1 && data.companyOwnerId.size() <= 128 && data.companyOwnerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+        data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 160 &&
+        data.joiningDate is string && data.joiningDate.size() >= 1 && data.joiningDate.size() <= 40 &&
+        data.checkpointDays is number && data.checkpointDays in [90, 180, 365] &&
+        data.dueDate is string && data.dueDate.size() >= 1 && data.dueDate.size() <= 40 &&
+        data.emailStatus is string && data.emailStatus in ['Pending', 'Sent', 'Failed'] &&
+        (!('responseDate' in data) || (data.responseDate is string && data.responseDate.size() <= 40)) &&
+        data.employmentStatus is string && data.employmentStatus in ['Unknown', 'Employed', 'Unemployed'] &&
+        data.remainsWithOriginalCompany is bool &&
+        (!('currentEmployer' in data) || (data.currentEmployer is string && data.currentEmployer.size() <= 160)) &&
+        (!('reportedSalary' in data) || (data.reportedSalary is number && data.reportedSalary >= 0)) &&
+        data.verificationStatus is string && data.verificationStatus in ['Unverified', 'Candidate Confirmed', 'Employer Verified'] &&
+        data.status is string && data.status in ['Scheduled', 'Reminder Sent', 'Awaiting Response', 'Confirmed Employed', 'Confirmed Unemployed', 'Employment Changed', 'Verification Required', 'Closed'] &&
+        data.assistanceRequested is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /retentionCheckIns/{checkInId} {
+      allow get: if isSignedIn() && isValidId(checkInId) && (
+        existing().candidateId == request.auth.uid ||
+        existing().companyOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().candidateId == request.auth.uid ||
+        existing().companyOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidId(checkInId) && isValidRetentionCheckIn(incoming()) &&
+        (incoming().companyOwnerId == request.auth.uid || isAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/placements/$(incoming().placementId));
+      allow update: if isSignedIn() && isValidId(checkInId) && isValidRetentionCheckIn(incoming()) && (
+        isAdmin() || (
+          existing().candidateId == request.auth.uid &&
+          existing().status != 'Closed' &&
+          incoming().placementId == existing().placementId &&
+          incoming().candidateId == existing().candidateId &&
+          incoming().companyId == existing().companyId &&
+          incoming().companyOwnerId == existing().companyOwnerId &&
+          incoming().checkpointDays == existing().checkpointDays &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'responseDate', 'employmentStatus', 'remainsWithOriginalCompany',
+            'currentEmployer', 'reportedSalary', 'verificationStatus', 'status',
+            'assistanceRequested', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(checkInId);
+    }
+
+    // 8. CoachingCenter (/coachingCenters/{centerId})
+    function isValidCoachingCenter(data) {
+      return data.keys().hasAll([
+          'ownerId', 'centerName', 'officialEmail', 'contactNumber',
+          'country', 'city', 'trainingMode', 'domains', 'approvalStatus', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'centerName', 'officialEmail', 'contactNumber', 'website',
+          'description', 'country', 'state', 'city', 'address', 'trainingMode',
+          'domains', 'trainerDetails', 'accreditation', 'approvalStatus',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.centerName is string && data.centerName.size() >= 1 && data.centerName.size() <= 160 &&
+        data.officialEmail is string && data.officialEmail.size() >= 3 && data.officialEmail.size() <= 254 &&
+        data.contactNumber is string && data.contactNumber.size() >= 3 && data.contactNumber.size() <= 30 &&
+        (!('website' in data) || (data.website is string && data.website.size() <= 300)) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+        data.country is string && data.country.size() >= 1 && data.country.size() <= 100 &&
+        (!('state' in data) || (data.state is string && data.state.size() <= 100)) &&
+        data.city is string && data.city.size() >= 1 && data.city.size() <= 100 &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 400)) &&
+        data.trainingMode is string && data.trainingMode in ['Online', 'Offline', 'Hybrid'] &&
+        isValidStringArray(data.domains, 20) &&
+        (!('trainerDetails' in data) || (data.trainerDetails is string && data.trainerDetails.size() <= 1000)) &&
+        (!('accreditation' in data) || (data.accreditation is string && data.accreditation.size() <= 400)) &&
+        data.approvalStatus is string && data.approvalStatus in ['pending', 'approved', 'rejected'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /coachingCenters/{centerId} {
+      allow get: if isValidId(centerId) && (existing().approvalStatus in ['approved', 'pending'] || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin())));
+      allow list: if existing().approvalStatus in ['approved', 'pending'] || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin()));
+      allow create: if isSignedIn() && isValidId(centerId) && isValidCoachingCenter(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        (incoming().approvalStatus == 'pending' || isAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(centerId) && isValidCoachingCenter(incoming()) && (
+        isAdmin() || (
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().approvalStatus == existing().approvalStatus &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'centerName', 'officialEmail', 'contactNumber', 'website', 'description',
+            'country', 'state', 'city', 'address', 'trainingMode', 'domains',
+            'trainerDetails', 'accreditation', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(centerId);
+    }
+
+    // 9. Course (/courses/{courseId})
+    function isValidCourse(data) {
+      return data.keys().hasAll([
+          'centerId', 'ownerId', 'centerName', 'courseName', 'category',
+          'description', 'skillsTaught', 'level', 'duration', 'fees',
+          'currency', 'deliveryMode', 'placementAssistance', 'status',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'centerId', 'ownerId', 'centerName', 'courseName', 'category',
+          'description', 'skillsTaught', 'level', 'duration', 'fees',
+          'currency', 'deliveryMode', 'startDate', 'endDate', 'schedule',
+          'prerequisites', 'trainerInfo', 'certificationDetails', 'syllabus',
+          'capacity', 'placementAssistance', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.centerId is string && data.centerId.size() >= 1 && data.centerId.size() <= 128 && data.centerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.centerName is string && data.centerName.size() >= 1 && data.centerName.size() <= 160 &&
+        data.courseName is string && data.courseName.size() >= 1 && data.courseName.size() <= 160 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 100 &&
+        data.description is string && data.description.size() >= 1 && data.description.size() <= 2000 &&
+        isValidStringArray(data.skillsTaught, 30) &&
+        data.level is string && data.level in ['Beginner', 'Intermediate', 'Advanced'] &&
+        data.duration is string && data.duration.size() >= 1 && data.duration.size() <= 80 &&
+        data.fees is number && data.fees >= 0 &&
+        data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+        data.deliveryMode is string && data.deliveryMode in ['Online', 'Offline', 'Hybrid'] &&
+        (!('startDate' in data) || (data.startDate is string && data.startDate.size() <= 40)) &&
+        (!('endDate' in data) || (data.endDate is string && data.endDate.size() <= 40)) &&
+        (!('schedule' in data) || (data.schedule is string && data.schedule.size() <= 200)) &&
+        (!('prerequisites' in data) || (data.prerequisites is string && data.prerequisites.size() <= 400)) &&
+        (!('trainerInfo' in data) || (data.trainerInfo is string && data.trainerInfo.size() <= 400)) &&
+        (!('certificationDetails' in data) || (data.certificationDetails is string && data.certificationDetails.size() <= 400)) &&
+        (!('syllabus' in data) || (data.syllabus is string && data.syllabus.size() <= 2000)) &&
+        (!('capacity' in data) || (data.capacity is number && data.capacity >= 1 && data.capacity <= 100000)) &&
+        data.placementAssistance is bool &&
+        data.status is string && data.status in ['published', 'archived'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /courses/{courseId} {
+      allow get: if isValidId(courseId) && (existing().status == 'published' || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin())));
+      allow list: if existing().status == 'published' || (isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin()));
+      allow create: if isSignedIn() && isValidId(courseId) && isValidCourse(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/coachingCenters/$(incoming().centerId));
+      allow update: if isSignedIn() && isValidId(courseId) && isValidCourse(incoming()) && (
+        isAdmin() || (
+          existing().ownerId == request.auth.uid &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().centerId == existing().centerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'courseName', 'category', 'description', 'skillsTaught', 'level',
+            'duration', 'fees', 'currency', 'deliveryMode', 'startDate', 'endDate',
+            'schedule', 'prerequisites', 'trainerInfo', 'certificationDetails',
+            'syllabus', 'capacity', 'placementAssistance', 'status', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(courseId);
+    }
+
+    // 10. CourseEnrollment (/enrollments/{enrollmentId})
+    function isValidCourseEnrollment(data) {
+      return data.keys().hasAll([
+          'courseId', 'courseName', 'centerId', 'centerOwnerId', 'centerName',
+          'studentId', 'studentName', 'skillsTaught', 'progressPercent',
+          'status', 'certificateIssued', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'courseId', 'courseName', 'centerId', 'centerOwnerId', 'centerName',
+          'studentId', 'studentName', 'skillsTaught', 'progressPercent',
+          'status', 'certificateIssued', 'certificateId', 'feedbackRating',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.courseId is string && data.courseId.size() >= 1 && data.courseId.size() <= 128 && data.courseId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.courseName is string && data.courseName.size() >= 1 && data.courseName.size() <= 160 &&
+        data.centerId is string && data.centerId.size() >= 1 && data.centerId.size() <= 128 && data.centerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.centerOwnerId is string && data.centerOwnerId.size() >= 1 && data.centerOwnerId.size() <= 128 && data.centerOwnerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.centerName is string && data.centerName.size() >= 1 && data.centerName.size() <= 160 &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 && data.studentId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120 &&
+        isValidStringArray(data.skillsTaught, 30) &&
+        data.progressPercent is number && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+        data.status is string && data.status in ['Enrolled', 'In Progress', 'Completed'] &&
+        data.certificateIssued is bool &&
+        (!('certificateId' in data) || (data.certificateId is string && data.certificateId.size() <= 80)) &&
+        (!('feedbackRating' in data) || (data.feedbackRating is number && data.feedbackRating >= 1 && data.feedbackRating <= 5)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow get: if isSignedIn() && isValidId(enrollmentId) && (
+        existing().studentId == request.auth.uid ||
+        existing().centerOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().studentId == request.auth.uid ||
+        existing().centerOwnerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidId(enrollmentId) && isValidCourseEnrollment(incoming()) &&
+        (
+          (incoming().studentId == request.auth.uid && incoming().status == 'Enrolled' && incoming().certificateIssued == false) ||
+          isAdmin()
+        ) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/courses/$(incoming().courseId));
+      allow update: if isSignedIn() && isValidId(enrollmentId) && isValidCourseEnrollment(incoming()) && (
+        isAdmin() ||
+        (
+          existing().centerOwnerId == request.auth.uid &&
+          incoming().studentId == existing().studentId &&
+          incoming().courseId == existing().courseId &&
+          incoming().centerOwnerId == existing().centerOwnerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['progressPercent', 'status', 'certificateIssued', 'certificateId', 'updatedAt'])
+        ) ||
+        (
+          existing().studentId == request.auth.uid &&
+          incoming().studentId == existing().studentId &&
+          incoming().courseId == existing().courseId &&
+          incoming().centerOwnerId == existing().centerOwnerId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['progressPercent', 'feedbackRating', 'updatedAt'])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(enrollmentId);
+    }
+
+    // 11. SalaryHistoryRecord (/salaryHistory/{recordId})
+    function isValidSalaryHistoryRecord(data) {
+      return data.keys().hasAll([
+          'userId', 'userName', 'recordType', 'companyName', 'designation',
+          'annualSalary', 'currency', 'verificationType', 'effectiveDate', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId', 'userName', 'recordType', 'companyName', 'designation',
+          'industry', 'annualSalary', 'currency', 'verificationType',
+          'skillsAtTime', 'effectiveDate', 'createdAt'
+        ]) &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 && data.userId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120 &&
+        data.recordType is string && data.recordType in ['Initial', 'Placement', 'Promotion', 'RetentionCheckIn', 'RoleChange'] &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+        data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 160 &&
+        (!('industry' in data) || (data.industry is string && data.industry.size() <= 120)) &&
+        data.annualSalary is number && data.annualSalary >= 0 &&
+        data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+        data.verificationType is string && data.verificationType in ['Self-Reported', 'Employer-Verified', 'Unverified'] &&
+        (!('skillsAtTime' in data) || isValidStringArray(data.skillsAtTime, 50)) &&
+        data.effectiveDate is string && data.effectiveDate.size() >= 1 && data.effectiveDate.size() <= 40 &&
+        data.createdAt is timestamp;
+    }
+
+    match /salaryHistory/{recordId} {
+      allow get: if isSignedIn() && isValidId(recordId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(recordId) && isValidSalaryHistoryRecord(incoming()) &&
+        (
+          (incoming().userId == request.auth.uid && incoming().verificationType == 'Self-Reported') ||
+          (incoming().recordType == 'Placement' && incoming().verificationType == 'Employer-Verified') ||
+          isAdmin()
+        ) &&
+        incoming().createdAt == request.time &&
+        exists(/databases/$(database)/documents/users/$(incoming().userId));
+      allow update: if isSignedIn() && isValidId(recordId) && isValidSalaryHistoryRecord(incoming()) && isAdmin() &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // 12. EmailNotificationLog (/emailNotifications/{notificationId})
+    function isValidEmailNotificationLog(data) {
+      return data.keys().hasAll([
+          'recipientId', 'recipientEmail', 'recipientName', 'templateType',
+          'subject', 'bodyPreview', 'deliveryStatus', 'sentAt', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'recipientId', 'recipientEmail', 'recipientName', 'templateType',
+          'subject', 'bodyPreview', 'checkpointDays', 'placementId', 'checkInId',
+          'deliveryStatus', 'sentAt', 'createdAt'
+        ]) &&
+        data.recipientId is string && data.recipientId.size() >= 1 && data.recipientId.size() <= 128 && data.recipientId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.recipientEmail is string && data.recipientEmail.size() >= 3 && data.recipientEmail.size() <= 254 &&
+        data.recipientName is string && data.recipientName.size() >= 1 && data.recipientName.size() <= 120 &&
+        data.templateType is string && data.templateType in ['Retention_90_Day', 'Retention_180_Day', 'Retention_365_Day', 'Placement_Confirmation', 'Unemployment_Support'] &&
+        data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 240 &&
+        data.bodyPreview is string && data.bodyPreview.size() >= 1 && data.bodyPreview.size() <= 2000 &&
+        (!('checkpointDays' in data) || (data.checkpointDays is number && data.checkpointDays in [90, 180, 365])) &&
+        (!('placementId' in data) || (data.placementId is string && data.placementId.size() <= 128)) &&
+        (!('checkInId' in data) || (data.checkInId is string && data.checkInId.size() <= 128)) &&
+        data.deliveryStatus is string && data.deliveryStatus in ['Delivered', 'Pending', 'Failed'] &&
+        data.sentAt is string && data.sentAt.size() >= 1 && data.sentAt.size() <= 40 &&
+        data.createdAt is timestamp;
+    }
+
+    match /emailNotifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId) && (existing().recipientId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().recipientId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidEmailNotificationLog(incoming()) &&
+        incoming().createdAt == request.time;
+      allow update: if isSignedIn() && isValidId(notificationId) && isValidEmailNotificationLog(incoming()) && isAdmin() &&
+        incoming().recipientId == existing().recipientId &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(notificationId);
+    }
+
+    // 13. AuditLog (/auditLogs/{logId})
+    function isValidAuditLog(data) {
+      return data.keys().hasAll([
+          'actorId', 'actorEmail', 'action', 'targetType', 'targetId', 'details', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'actorId', 'actorEmail', 'action', 'targetType', 'targetId', 'details', 'createdAt'
+        ]) &&
+        data.actorId is string && data.actorId.size() >= 1 && data.actorId.size() <= 128 && data.actorId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.actorEmail is string && data.actorEmail.size() >= 3 && data.actorEmail.size() <= 254 &&
+        data.action is string && data.action.size() >= 1 && data.action.size() <= 160 &&
+        data.targetType is string && data.targetType.size() >= 1 && data.targetType.size() <= 80 &&
+        data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 &&
+        data.details is string && data.details.size() >= 1 && data.details.size() <= 1000 &&
+        data.createdAt is timestamp;
+    }
+
+    match /auditLogs/{logId} {
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isAdmin() && existing().actorId is string;
+      allow create: if isSignedIn() && isValidId(logId) && isValidAuditLog(incoming()) &&
+        incoming().actorId == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // 14. AdminRecord (/admins/{adminId})
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 && data.uid.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.createdAt is timestamp;
+    }
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin() && existing().uid is string;
+      allow create: if isAdmin() && isValidId(adminId) && isValidAdminRecord(incoming()) &&
+        incoming().uid == adminId &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+  }
+}

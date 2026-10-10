@@ -1,0 +1,401 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Public career profile and extracted skill summary for a platform user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["user", "company", "coaching", "admin"] },
+        "careerStatus": { "type": "string", "enum": ["undergraduate", "graduated_unemployed", "graduated_employed", "postgraduate", "other"] },
+        "highestQualification": { "type": "string", "maxLength": 120 },
+        "collegeName": { "type": "string", "maxLength": 200 },
+        "graduationYear": { "type": "string", "maxLength": 10 },
+        "fieldOfStudy": { "type": "string", "maxLength": 120 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 100 },
+        "country": { "type": "string", "maxLength": 100 },
+        "skills": { "type": "array", "description": "Up to 50 skill tags" },
+        "targetRoles": { "type": "array", "description": "Up to 20 preferred job roles" },
+        "resumeSummary": { "type": "string", "maxLength": 2000 },
+        "readinessScore": { "type": "number" },
+        "yearsOfExperience": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "careerStatus", "createdAt", "updatedAt"]
+    },
+    "UserPrivateRecord": {
+      "title": "UserPrivateRecord",
+      "description": "Strictly isolated PII, contact information, compensation details, and full AI resume dossier.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 254 },
+        "mobileNumber": { "type": "string", "maxLength": 30 },
+        "dateOfBirth": { "type": "string", "maxLength": 20 },
+        "gender": { "type": "string", "maxLength": 40 },
+        "postalCode": { "type": "string", "maxLength": 20 },
+        "currentCompany": { "type": "string", "maxLength": 160 },
+        "designation": { "type": "string", "maxLength": 160 },
+        "industry": { "type": "string", "maxLength": 120 },
+        "workLocation": { "type": "string", "maxLength": 160 },
+        "joiningDate": { "type": "string", "maxLength": 30 },
+        "currentSalary": { "type": "number" },
+        "expectedSalary": { "type": "number" },
+        "employeeIdVerification": { "type": "string", "maxLength": 80 },
+        "privacyConsent": { "type": "boolean" },
+        "emailNotificationsConsent": { "type": "boolean" },
+        "resumeFileName": { "type": "string", "maxLength": 255 },
+        "resumeAnalysisJson": { "type": "string", "maxLength": 20000 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "privacyConsent", "emailNotificationsConsent", "updatedAt"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Employer and recruiter organization record.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 160 },
+        "officialEmail": { "type": "string", "maxLength": 254 },
+        "contactPerson": { "type": "string", "maxLength": 120 },
+        "contactNumber": { "type": "string", "maxLength": 30 },
+        "website": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "industry": { "type": "string", "maxLength": 120 },
+        "companySize": { "type": "string", "maxLength": 60 },
+        "yearEstablished": { "type": "string", "maxLength": 10 },
+        "headquarters": { "type": "string", "maxLength": 160 },
+        "country": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 100 },
+        "officeAddress": { "type": "string", "maxLength": 400 },
+        "verificationStatus": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "companyName", "officialEmail", "contactPerson", "industry", "country", "city", "verificationStatus", "createdAt", "updatedAt"]
+    },
+    "JobListing": {
+      "title": "JobListing",
+      "description": "Job opportunity published by a registered company.",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 160 },
+        "title": { "type": "string", "maxLength": 160 },
+        "department": { "type": "string", "maxLength": 120 },
+        "industry": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "requiredSkills": { "type": "array" },
+        "preferredSkills": { "type": "array" },
+        "educationalQualifications": { "type": "string", "maxLength": 240 },
+        "requiredExperience": { "type": "string", "maxLength": 80 },
+        "vacancies": { "type": "number" },
+        "employmentType": { "type": "string", "enum": ["Full-time", "Internship", "Contract", "Part-time"] },
+        "workMode": { "type": "string", "enum": ["On-site", "Hybrid", "Remote"] },
+        "location": { "type": "string", "maxLength": 160 },
+        "country": { "type": "string", "maxLength": 100 },
+        "salaryMin": { "type": "number" },
+        "salaryMax": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "benefits": { "type": "string", "maxLength": 1000 },
+        "deadline": { "type": "string", "maxLength": 40 },
+        "interviewProcess": { "type": "string", "maxLength": 1000 },
+        "requiredCertifications": { "type": "string", "maxLength": 400 },
+        "status": { "type": "string", "enum": ["active", "paused", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["companyId", "ownerId", "companyName", "title", "industry", "description", "requiredSkills", "employmentType", "workMode", "location", "salaryMin", "salaryMax", "currency", "status", "createdAt", "updatedAt"]
+    },
+    "JobApplication": {
+      "title": "JobApplication",
+      "description": "Candidate application to a specific job listing.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jobTitle": { "type": "string", "maxLength": 160 },
+        "companyId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyOwnerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 160 },
+        "candidateId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "candidateName": { "type": "string", "maxLength": 120 },
+        "candidateEmail": { "type": "string", "maxLength": 254 },
+        "candidateQualification": { "type": "string", "maxLength": 160 },
+        "candidateSkills": { "type": "array" },
+        "matchScore": { "type": "number" },
+        "matchExplanation": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["Applied", "Under Review", "Shortlisted", "Interview", "Offered", "Hired", "Rejected"] },
+        "interviewDate": { "type": "string", "maxLength": 60 },
+        "offeredSalary": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "jobTitle", "companyId", "companyOwnerId", "companyName", "candidateId", "candidateName", "candidateSkills", "matchScore", "status", "createdAt", "updatedAt"]
+    },
+    "PlacementRecord": {
+      "title": "PlacementRecord",
+      "description": "Confirmed candidate placement record upon hiring.",
+      "type": "object",
+      "properties": {
+        "candidateId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "candidateName": { "type": "string", "maxLength": 120 },
+        "candidateEmail": { "type": "string", "maxLength": 254 },
+        "jobId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jobTitle": { "type": "string", "maxLength": 160 },
+        "companyId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyOwnerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 160 },
+        "designation": { "type": "string", "maxLength": 160 },
+        "joiningDate": { "type": "string", "maxLength": 40 },
+        "workLocation": { "type": "string", "maxLength": 160 },
+        "offeredSalary": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "employmentType": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["confirmed", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["candidateId", "candidateName", "jobId", "companyId", "companyOwnerId", "companyName", "designation", "joiningDate", "workLocation", "offeredSalary", "currency", "employmentType", "status", "createdAt", "updatedAt"]
+    },
+    "RetentionCheckIn": {
+      "title": "RetentionCheckIn",
+      "description": "90-day, 180-day, and 365-day post-placement retention check-in record.",
+      "type": "object",
+      "properties": {
+        "placementId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "candidateId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "candidateName": { "type": "string", "maxLength": 120 },
+        "candidateEmail": { "type": "string", "maxLength": 254 },
+        "companyId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyOwnerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 160 },
+        "designation": { "type": "string", "maxLength": 160 },
+        "joiningDate": { "type": "string", "maxLength": 40 },
+        "checkpointDays": { "type": "number" },
+        "dueDate": { "type": "string", "maxLength": 40 },
+        "emailStatus": { "type": "string", "enum": ["Pending", "Sent", "Failed"] },
+        "responseDate": { "type": "string", "maxLength": 40 },
+        "employmentStatus": { "type": "string", "enum": ["Unknown", "Employed", "Unemployed"] },
+        "remainsWithOriginalCompany": { "type": "boolean" },
+        "currentEmployer": { "type": "string", "maxLength": 160 },
+        "reportedSalary": { "type": "number" },
+        "verificationStatus": { "type": "string", "enum": ["Unverified", "Candidate Confirmed", "Employer Verified"] },
+        "status": { "type": "string", "enum": ["Scheduled", "Reminder Sent", "Awaiting Response", "Confirmed Employed", "Confirmed Unemployed", "Employment Changed", "Verification Required", "Closed"] },
+        "assistanceRequested": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["placementId", "candidateId", "candidateName", "companyId", "companyOwnerId", "companyName", "designation", "joiningDate", "checkpointDays", "dueDate", "emailStatus", "employmentStatus", "remainsWithOriginalCompany", "verificationStatus", "status", "assistanceRequested", "createdAt", "updatedAt"]
+    },
+    "CoachingCenter": {
+      "title": "CoachingCenter",
+      "description": "Training institute or coaching center offering skill-development courses.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "centerName": { "type": "string", "maxLength": 160 },
+        "officialEmail": { "type": "string", "maxLength": 254 },
+        "contactNumber": { "type": "string", "maxLength": 30 },
+        "website": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "country": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 100 },
+        "address": { "type": "string", "maxLength": 400 },
+        "trainingMode": { "type": "string", "enum": ["Online", "Offline", "Hybrid"] },
+        "domains": { "type": "array" },
+        "trainerDetails": { "type": "string", "maxLength": 1000 },
+        "accreditation": { "type": "string", "maxLength": 400 },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "centerName", "officialEmail", "contactNumber", "country", "city", "trainingMode", "domains", "approvalStatus", "createdAt", "updatedAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Skill development course published by a coaching center.",
+      "type": "object",
+      "properties": {
+        "centerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "centerName": { "type": "string", "maxLength": 160 },
+        "courseName": { "type": "string", "maxLength": 160 },
+        "category": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "skillsTaught": { "type": "array" },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced"] },
+        "duration": { "type": "string", "maxLength": 80 },
+        "fees": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "deliveryMode": { "type": "string", "enum": ["Online", "Offline", "Hybrid"] },
+        "startDate": { "type": "string", "maxLength": 40 },
+        "endDate": { "type": "string", "maxLength": 40 },
+        "schedule": { "type": "string", "maxLength": 200 },
+        "prerequisites": { "type": "string", "maxLength": 400 },
+        "trainerInfo": { "type": "string", "maxLength": 400 },
+        "certificationDetails": { "type": "string", "maxLength": 400 },
+        "syllabus": { "type": "string", "maxLength": 2000 },
+        "capacity": { "type": "number" },
+        "placementAssistance": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["published", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["centerId", "ownerId", "centerName", "courseName", "category", "description", "skillsTaught", "level", "duration", "fees", "currency", "deliveryMode", "placementAssistance", "status", "createdAt", "updatedAt"]
+    },
+    "CourseEnrollment": {
+      "title": "CourseEnrollment",
+      "description": "Learner enrollment and progress tracking in a skill development course.",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseName": { "type": "string", "maxLength": 160 },
+        "centerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "centerOwnerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "centerName": { "type": "string", "maxLength": 160 },
+        "studentId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "skillsTaught": { "type": "array" },
+        "progressPercent": { "type": "number" },
+        "status": { "type": "string", "enum": ["Enrolled", "In Progress", "Completed"] },
+        "certificateIssued": { "type": "boolean" },
+        "certificateId": { "type": "string", "maxLength": 80 },
+        "feedbackRating": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["courseId", "courseName", "centerId", "centerOwnerId", "centerName", "studentId", "studentName", "skillsTaught", "progressPercent", "status", "certificateIssued", "createdAt", "updatedAt"]
+    },
+    "SalaryHistoryRecord": {
+      "title": "SalaryHistoryRecord",
+      "description": "Private and admin-auditable record of salary and career milestones.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "maxLength": 120 },
+        "recordType": { "type": "string", "enum": ["Initial", "Placement", "Promotion", "RetentionCheckIn", "RoleChange"] },
+        "companyName": { "type": "string", "maxLength": 160 },
+        "designation": { "type": "string", "maxLength": 160 },
+        "industry": { "type": "string", "maxLength": 120 },
+        "annualSalary": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "verificationType": { "type": "string", "enum": ["Self-Reported", "Employer-Verified", "Unverified"] },
+        "skillsAtTime": { "type": "array" },
+        "effectiveDate": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "recordType", "companyName", "designation", "annualSalary", "currency", "verificationType", "effectiveDate", "createdAt"]
+    },
+    "EmailNotificationLog": {
+      "title": "EmailNotificationLog",
+      "description": "Delivery log of automated retention and career check-in notifications.",
+      "type": "object",
+      "properties": {
+        "recipientId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientEmail": { "type": "string", "maxLength": 254 },
+        "recipientName": { "type": "string", "maxLength": 120 },
+        "templateType": { "type": "string", "enum": ["Retention_90_Day", "Retention_180_Day", "Retention_365_Day", "Placement_Confirmation", "Unemployment_Support"] },
+        "subject": { "type": "string", "maxLength": 240 },
+        "bodyPreview": { "type": "string", "maxLength": 2000 },
+        "checkpointDays": { "type": "number" },
+        "placementId": { "type": "string", "maxLength": 128 },
+        "checkInId": { "type": "string", "maxLength": 128 },
+        "deliveryStatus": { "type": "string", "enum": ["Delivered", "Pending", "Failed"] },
+        "sentAt": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["recipientId", "recipientEmail", "recipientName", "templateType", "subject", "bodyPreview", "deliveryStatus", "sentAt", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit log for administrative actions and platform state changes.",
+      "type": "object",
+      "properties": {
+        "actorId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorEmail": { "type": "string", "maxLength": 254 },
+        "action": { "type": "string", "maxLength": 160 },
+        "targetType": { "type": "string", "maxLength": 80 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorId", "actorEmail", "action", "targetType", "targetId", "details", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted administrator membership document.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 254 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Public career summaries and extracted skill profiles."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateRecord" },
+      "description": "Strictly isolated PII, contact details, compensation, and full AI resume analysis."
+    },
+    "/companies/{companyId}": {
+      "schema": { "$ref": "#/entities/Company" },
+      "description": "Registered employer organizations."
+    },
+    "/jobs/{jobId}": {
+      "schema": { "$ref": "#/entities/JobListing" },
+      "description": "Published job opportunities."
+    },
+    "/applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/JobApplication" },
+      "description": "Candidate job applications."
+    },
+    "/placements/{placementId}": {
+      "schema": { "$ref": "#/entities/PlacementRecord" },
+      "description": "Confirmed job placements."
+    },
+    "/retentionCheckIns/{checkInId}": {
+      "schema": { "$ref": "#/entities/RetentionCheckIn" },
+      "description": "90-day, 180-day, and 365-day employee retention check-in records."
+    },
+    "/coachingCenters/{centerId}": {
+      "schema": { "$ref": "#/entities/CoachingCenter" },
+      "description": "Registered coaching centers and training institutes."
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Skill development courses."
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": { "$ref": "#/entities/CourseEnrollment" },
+      "description": "Student course enrollments and completion certificates."
+    },
+    "/salaryHistory/{recordId}": {
+      "schema": { "$ref": "#/entities/SalaryHistoryRecord" },
+      "description": "Career salary progression records."
+    },
+    "/emailNotifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/EmailNotificationLog" },
+      "description": "Automated retention email logs."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Administrative audit trail."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Administrator registry."
+    }
+  }
+}
